@@ -2,7 +2,6 @@ package com.example.inventoryservice.service;
 
 import com.example.inventoryservice.model.OrderConfirmedEvent;
 import com.example.inventoryservice.repository.InventoryRepository;
-import com.example.inventoryservice.service.listener.OrderConfirmationListener;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;

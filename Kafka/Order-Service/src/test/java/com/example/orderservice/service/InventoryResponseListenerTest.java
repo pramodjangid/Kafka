@@ -2,7 +2,7 @@ package com.example.orderservice.service;
 
 import com.example.orderservice.model.InventoryResponseEvent;
 import com.example.orderservice.model.OrderConfirmedEvent;
-import com.example.orderservice.service.listener.InventoryResponseListener;
+import com.example.orderservice.listeners.InventoryResponseListenerImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,7 +19,7 @@ import static org.mockito.Mockito.*;
 class InventoryResponseListenerTest {
 
     @InjectMocks
-    private InventoryResponseListener listener;
+    private InventoryResponseListenerImpl listener;
 
     @Mock
     private ObjectMapper objectMapper;

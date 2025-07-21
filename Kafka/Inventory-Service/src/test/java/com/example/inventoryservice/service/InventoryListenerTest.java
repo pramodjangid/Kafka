@@ -3,7 +3,6 @@ package com.example.inventoryservice.service;
 import com.example.inventoryservice.model.InventoryResponseEvent;
 import com.example.inventoryservice.model.OrderPlacedEvent;
 import com.example.inventoryservice.repository.InventoryRepository;
-import com.example.inventoryservice.service.listener.InventoryListener;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
