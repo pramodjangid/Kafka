@@ -1,6 +1,6 @@
-package com.example.inventoryservice.listeners;
+package com.example.inventoryservice.consumer;
 
-public interface InventoryServiceListener {
+public interface InventoryServiceConsumer {
     void handleOrderEvent(String message);
     void handleOrderConfirmationEvent(String message);
 }
