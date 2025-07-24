@@ -1,77 +1,89 @@
 package com.example.orderservice.service;
 
-import com.example.orderservice.entity.Order;
-import com.example.orderservice.enums.OrderStatus;
 import com.example.orderservice.model.InventoryResponseEvent;
 import com.example.orderservice.model.OrderConfirmedEvent;
 import com.example.orderservice.model.OrderPlacedEvent;
 import com.example.orderservice.model.OrderRequest;
 import com.example.orderservice.producer.OrderServiceProducer;
-import com.example.orderservice.repository.OrderRepository;
-import com.example.orderservice.util.EventBuilderUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Service
 public class OrderService {
 
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Autowired
     private OrderServiceProducer orderServiceProducer;
 
     @Autowired
-    private OrderRepository orderRepository;
+    private OrderResponseStore responseStore;
+
 
     public ResponseEntity<String> placeOrder(OrderRequest request) {
-        Order order = Order.builder()
-                .orderId(request.getOrderId())
-                .productId(request.getProductId())
-                .quantity(request.getQuantity())
-                .status(OrderStatus.PENDING)
-                .build();
-        orderRepository.save(order);
+        OrderPlacedEvent event = new OrderPlacedEvent(request.getOrderId(), request.getProductId(), request.getQuantity());
 
-        OrderPlacedEvent event = EventBuilderUtil.buildOrderPlacedEvent(request.getOrderId(), request.getProductId(), request.getQuantity());
+        CompletableFuture<String> future = new CompletableFuture<>();
+        responseStore.store(request.getOrderId(), future);
+
         orderServiceProducer.sendOrderPlacedEvent(event);
 
-        return ResponseEntity.ok("Order placed. Check status via /orders/{orderId}/status");
-    }
-
-    public void listenInventoryResponse(InventoryResponseEvent event) {
-        log.info("Received inventory response: {}", event);
-
-        Order order = orderRepository.findById(event.getOrderId()).orElse(null);
-        if (order == null) {
-            log.warn("Order not found: {}", event.getOrderId());
-            return;
-        }
-
-        if (order.getStatus() != OrderStatus.PENDING) {
-            log.info("Order already processed with status: {}", order.getStatus());
-            return;
-        }
-
-        if (event.isAvailable()) {
-            OrderConfirmedEvent confirmation = EventBuilderUtil.buildOrderConfirmedEvent(event.getOrderId(), event.getProductId(), event.getQuantity());
-            orderServiceProducer.sendOrderConfirmationEvent(confirmation);
-            order.setStatus(OrderStatus.CONFIRMED);
-            orderRepository.save(order);
-        } else {
-            order.setStatus(OrderStatus.REJECTED);
-            orderRepository.save(order);
+        try {
+            String result = future.get(5, TimeUnit.SECONDS);
+            return ResponseEntity.ok(result);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Inventory processing failed: " + cause.getMessage());
+        } catch (TimeoutException e) {
+            return ResponseEntity.status(HttpStatus.REQUEST_TIMEOUT)
+                    .body("Timed out waiting for inventory response");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Unexpected error: " + e.getMessage());
         }
     }
 
-    public ResponseEntity<String> getOrderStatus(String orderId) {
-        return orderRepository.findById(orderId)
-                .map(order -> ResponseEntity.ok("Order Status: " + order.getStatus()))
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body("Order not found with ID: " + orderId));
+    public void listenInventoryResponse(String message) {
+        System.out.println("I am here 6"+ message);
+
+        try {
+            InventoryResponseEvent event = objectMapper.readValue(message, InventoryResponseEvent.class);
+            log.info("I am here 1 {}", event);
+            if (event.isAvailable()) {
+                OrderConfirmedEvent orderConfirmedEvent = new OrderConfirmedEvent(event.getOrderId(), event.getProductId(), event.getQuantity());
+                log.info("I am here 2 {}", orderConfirmedEvent);
+
+                orderServiceProducer.sendOrderConfirmationEvent(orderConfirmedEvent);
+
+                responseStore.complete(event.getOrderId(), "Order placed successfully");
+            } else {
+                responseStore.complete(event.getOrderId(), "Product not available in inventory");
+            }
+        } catch (Exception e) {
+            log.error("Failed to process inventory response", e);
+            String fallbackOrderId = extractOrderIdFromJson(message);
+            responseStore.completeExceptionally(fallbackOrderId, e);
+        }
+    }
+
+    private String extractOrderIdFromJson(String json) {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            return objectMapper.readTree(json).get("orderId").asText();
+        } catch (Exception ex) {
+            return "unknown-order";
+        }
     }
 }

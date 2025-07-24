@@ -18,10 +18,4 @@ public class OrderController {
     public ResponseEntity<String> placeOrder(@Valid @RequestBody OrderRequest request) {
         return orderService.placeOrder(request);
     }
-
-    @GetMapping("/{orderId}/status")
-    public ResponseEntity<String> getOrderStatus(@PathVariable String orderId) {
-        return orderService.getOrderStatus(orderId);
-    }
-
 }
