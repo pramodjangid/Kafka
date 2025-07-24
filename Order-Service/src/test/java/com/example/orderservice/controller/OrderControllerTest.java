@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,5 +33,19 @@ class OrderControllerTest {
 
         assertEquals("Mocked", response.getBody());
         verify(orderService).placeOrder(request);
+    }
+
+    @Test
+    void getOrderStatus_shouldReturnStatusResponse() {
+        // Arrange
+        String orderId = "order_123";
+        when(orderService.getOrderStatus(orderId))
+                .thenReturn(ResponseEntity.ok("Inventory Reserved"));
+
+        ResponseEntity<String> response = orderController.getOrderStatus(orderId);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Inventory Reserved", response.getBody());
+        verify(orderService).getOrderStatus(orderId);
     }
 }

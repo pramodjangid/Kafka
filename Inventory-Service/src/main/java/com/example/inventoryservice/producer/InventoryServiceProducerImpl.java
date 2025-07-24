@@ -1,19 +1,21 @@
 package com.example.inventoryservice.producer;
 
-import com.example.inventoryservice.constants.KafkaTopics;
+import com.example.inventoryservice.constants.Constants;
 import com.example.inventoryservice.model.InventoryResponseEvent;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.kafka.core.KafkaTemplate;
+import com.example.inventoryservice.util.KafkaEventPublisher;
 import org.springframework.stereotype.Component;
 
 @Component
 public class InventoryServiceProducerImpl implements InventoryServiceProducer {
 
-    @Autowired
-    private KafkaTemplate<String, Object> kafkaTemplate;
+    private final KafkaEventPublisher publisher;
+
+    public InventoryServiceProducerImpl(KafkaEventPublisher publisher) {
+        this.publisher = publisher;
+    }
 
     @Override
     public void sendInventoryResponse(InventoryResponseEvent event) {
-        kafkaTemplate.send(KafkaTopics.INVENTORY_RESPONSE, event.getOrderId(), event);
+        publisher.publish(Constants.INVENTORY_RESPONSE, event.getOrderId(), event);
     }
 }
